@@ -69,12 +69,17 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
 
   const executeDisbursement = () => {
     if (!result || !selectedEmpId) return;
+    
+    const now = new Date();
+    const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(now);
+    const currentYear = now.getFullYear();
+
     const record: PayrollRecord = {
         id: 'PAY' + Date.now(),
         employeeId: selectedEmpId,
         companyId: currentCompany.id,
-        month: 'May',
-        year: 2024,
+        month: currentMonth,
+        year: currentYear,
         grossSalary: result.grossSalary,
         netSalary: result.netSalary,
         tax: result.tax,
@@ -82,15 +87,24 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
         bonuses: bonus,
         overtimeHours: overtime,
         unpaidLeaves: leaves,
-        status: 'Pending',
+        status: 'Paid',
         breakdown: result.breakdown,
-        generatedAt: new Date().toISOString()
+        generatedAt: now.toISOString()
     };
     onRecordCreated(record);
     setResult(null);
     setSelectedEmpId('');
     setView('input');
     setShowConfirmDisburse(false);
+  };
+
+  const getDisplayPeriod = () => {
+    if (initialRecord) {
+      return `${initialRecord.month} ${initialRecord.year}`;
+    }
+    const now = new Date();
+    const month = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(now);
+    return `${month} ${now.getFullYear()}`;
   };
 
   if (view === 'payslip' && result && selectedEmployee) {
@@ -116,7 +130,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
                 </div>
                 <div className="text-right">
                     <span className="px-3 py-1 bg-blue-50 text-[#1677ff] rounded border border-blue-100 font-bold uppercase text-[10px] tracking-widest">
-                        {initialRecord ? initialRecord.month : 'MAY'} 2024
+                        {getDisplayPeriod()}
                     </span>
                 </div>
             </div>

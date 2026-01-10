@@ -2,7 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Employee, Country, PayrollRecord } from "../types";
 
-// Helper for payroll calculation using AI
 export const calculatePayrollWithAI = async (
   employee: Employee,
   overtimeHours: number,
@@ -12,8 +11,7 @@ export const calculatePayrollWithAI = async (
   const apiKey = process.env.API_KEY;
   
   if (!apiKey || apiKey === "undefined" || apiKey === "") {
-    console.error("Gemini API Key is missing. Current key state:", apiKey);
-    alert("System Error: Gemini API_KEY is not configured in Vercel Environment Variables. Please check Settings.");
+    console.error("Gemini API Key is missing.");
     return null;
   }
 
@@ -21,20 +19,36 @@ export const calculatePayrollWithAI = async (
     const ai = new GoogleGenAI({ apiKey });
     const modelName = 'gemini-3-flash-preview';
     
+    // Enhanced system instruction for the model
+    const systemInstruction = `
+      You are an expert Payroll Auditor specializing in regional tax compliance for Bangladesh (BD), Saudi Arabia (KSA), and UAE.
+      Your task is to calculate a precise monthly payroll breakdown.
+      Rules:
+      - BD: Apply standard income tax slabs if salary exceeds threshold.
+      - KSA: Calculate GOSI deductions (9-10% usually). No income tax for citizens, check for expats.
+      - UAE: No income tax, but calculate social security if applicable.
+      - Calculate "Unpaid Leave Deduction" as (Gross Salary / 30) * unpaidLeaveDays.
+      - Calculate "Overtime Pay" as ((Basic / 208) * 1.5) * overtimeHours.
+      - Provide a "taxExplanation" field explaining the logic in 1-2 sentences.
+      - If inputs seem unrealistic (e.g. overtime > 100 hours), flag it in "warning" field.
+    `;
+
     const prompt = `
-      Calculate payroll for the following employee based on their country's tax laws.
-      Employee: ${JSON.stringify(employee)}
-      Overtime: ${overtimeHours} hrs
-      Bonus: ${bonus}
-      Unpaid Leaves: ${unpaidLeaveDays} days
+      Perform payroll calculation for:
+      Employee Data: ${JSON.stringify(employee)}
+      Additional Inputs:
+      - Overtime: ${overtimeHours} hours
+      - One-time Bonus: ${bonus}
+      - Unpaid Leaves: ${unpaidLeaveDays} days
       
-      Return JSON with grossSalary, tax, complianceDeductions, netSalary, and breakdown details.
+      Ensure the output is strictly JSON.
     `;
 
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
+        systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -43,14 +57,16 @@ export const calculatePayrollWithAI = async (
             tax: { type: Type.NUMBER },
             complianceDeductions: { type: Type.NUMBER },
             netSalary: { type: Type.NUMBER },
+            warning: { type: Type.STRING, description: "Any data entry warnings or errors" },
             breakdown: {
               type: Type.OBJECT,
               properties: {
                 baseTotal: { type: Type.NUMBER },
                 overtimePay: { type: Type.NUMBER },
+                leaveDeduction: { type: Type.NUMBER },
                 taxExplanation: { type: Type.STRING }
               },
-              required: ["baseTotal", "overtimePay"]
+              required: ["baseTotal", "overtimePay", "leaveDeduction", "taxExplanation"]
             }
           },
           required: ["grossSalary", "tax", "netSalary", "breakdown"]
@@ -61,7 +77,6 @@ export const calculatePayrollWithAI = async (
     return JSON.parse(response.text);
   } catch (error) {
     console.error("Gemini AI Error:", error);
-    alert("AI calculation failed. Please check your internet connection or API limits.");
     return null;
   }
 };
@@ -74,7 +89,7 @@ export const getPayrollInsights = async (records: PayrollRecord[], employees: Em
     const ai = new GoogleGenAI({ apiKey });
     const modelName = 'gemini-3-flash-preview';
     
-    const prompt = `Provide 3 short business insights for a total cost of ${records.reduce((acc, curr) => acc + curr.grossSalary, 0)}. Return JSON array.`;
+    const prompt = `Provide 3 strategic payroll cost optimization insights for a company with ${employees.length} employees and a total monthly spend of ${records.reduce((acc, curr) => acc + curr.grossSalary, 0)}. Return JSON array of objects with 'type', 'message', and 'action'.`;
 
     const response = await ai.models.generateContent({
       model: modelName,
@@ -89,7 +104,8 @@ export const getPayrollInsights = async (records: PayrollRecord[], employees: Em
               type: { type: Type.STRING },
               message: { type: Type.STRING },
               action: { type: Type.STRING }
-            }
+            },
+            required: ["type", "message", "action"]
           }
         }
       }

@@ -1,0 +1,5 @@
+{
+  "name": "ZenPayroll AI",
+  "description": "A high-performance AI-powered payroll management system featuring automated salary calculation, multi-country tax compliance, and smart financial insights using Gemini.",
+  "requestFramePermissions": []
+}

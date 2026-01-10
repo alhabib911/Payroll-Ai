@@ -41,7 +41,6 @@ const App: React.FC = () => {
         const parsed = JSON.parse(savedProfile);
         if (parsed.isLoggedIn) {
           setProfile(parsed);
-          setLoading(true);
         }
       } catch (e) {
         localStorage.removeItem('zp_session');
@@ -92,7 +91,7 @@ const App: React.FC = () => {
       }
     };
     fetchCompanyData();
-  }, [currentCompany, profile.isLoggedIn]);
+  }, [currentCompany?.id, profile.isLoggedIn]);
 
   useEffect(() => {
     const fetchInsights = async () => {
@@ -114,7 +113,6 @@ const App: React.FC = () => {
   const handleLogin = (newProfile: AdminProfile) => {
     setProfile(newProfile);
     localStorage.setItem('zp_session', JSON.stringify(newProfile));
-    setLoading(true);
   };
 
   const handleLogout = () => {
@@ -167,6 +165,16 @@ const App: React.FC = () => {
     return <Auth onLogin={handleLogin} />;
   }
 
+  // Ensure Layout doesn't crash if data is still loading
+  if (loading && !currentCompany) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-[#f0f2f5]">
+        <Loader2 className="w-8 h-8 text-[#1677ff] animate-spin mb-4" />
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Initialising Corporate Data...</p>
+      </div>
+    );
+  }
+
   return (
     <Layout 
       activeTab={activeTab} 
@@ -174,7 +182,7 @@ const App: React.FC = () => {
         setActiveTab(tab);
         if (tab !== 'payroll') setSelectedRecordForPayslip(null);
       }}
-      currentCompany={currentCompany!}
+      currentCompany={currentCompany}
       onCompanyChange={setCurrentCompany}
       language={language}
       onLanguageChange={setLanguage}
@@ -201,7 +209,7 @@ const App: React.FC = () => {
             <EmployeeList 
               employees={employees} 
               onAddEmployee={handleAddEmployee} 
-              companyId={currentCompany!.id}
+              companyId={currentCompany?.id || ''}
               userRole={profile.role}
               departments={departments}
               onAddDepartment={handleAddDepartment}
@@ -233,7 +241,7 @@ const App: React.FC = () => {
               <div className="flex justify-between items-end">
                   <div>
                       <h2 className="text-xl font-bold text-slate-800">AI Financial Auditor</h2>
-                      <p className="text-xs font-medium text-slate-400">Automated budget analysis and compliance audit for {currentCompany!.name}.</p>
+                      <p className="text-xs font-medium text-slate-400">Automated budget analysis and compliance audit for {currentCompany?.name}.</p>
                   </div>
                   {loadingInsights && <div className="animate-pulse text-[#1677ff] font-bold text-[10px] uppercase flex items-center gap-2">
                     <Loader2 className="w-3 h-3 animate-spin" /> AUDITING IN PROGRESS...

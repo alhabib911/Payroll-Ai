@@ -27,7 +27,7 @@ interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  currentCompany: Company;
+  currentCompany: Company | null;
   onCompanyChange: (company: Company) => void;
   language: Language;
   onLanguageChange: (lang: Language) => void;
@@ -100,7 +100,7 @@ const Layout: React.FC<LayoutProps> = ({
     if (!companyToDelete) return;
     const updated = await api.deleteCompany(companyToDelete);
     onCompaniesUpdate(updated);
-    if (currentCompany.id === companyToDelete && updated.length > 0) {
+    if (currentCompany?.id === companyToDelete && updated.length > 0) {
       onCompanyChange(updated[0]);
     }
     setCompanyToDelete(null);
@@ -144,10 +144,12 @@ const Layout: React.FC<LayoutProps> = ({
             >
               <div className="flex items-center gap-2.5 overflow-hidden">
                 <div className="w-7 h-7 flex-shrink-0 rounded bg-white/10 flex items-center justify-center text-sm">
-                  {currentCompany.logo}
+                  {currentCompany ? currentCompany.logo : '🏢'}
                 </div>
                 <div className="text-left overflow-hidden">
-                  <p className="text-[11px] font-bold truncate text-white/80">{currentCompany.name}</p>
+                  <p className="text-[11px] font-bold truncate text-white/80">
+                    {currentCompany ? currentCompany.name : 'Initializing...'}
+                  </p>
                 </div>
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-white/40 transition-transform duration-300 ${showCompanyMenu ? 'rotate-180' : ''}`} />
@@ -163,7 +165,7 @@ const Layout: React.FC<LayoutProps> = ({
                         onCompanyChange(company);
                         setShowCompanyMenu(false);
                       }}
-                      className={`px-4 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${company.id === currentCompany.id ? 'bg-[#1677ff] text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
+                      className={`px-4 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${company.id === currentCompany?.id ? 'bg-[#1677ff] text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <div className="flex items-center gap-3">
                         <span>{company.logo}</span>

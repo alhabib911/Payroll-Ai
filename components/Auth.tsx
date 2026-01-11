@@ -30,7 +30,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       if (isLogin) {
         const { email, password } = formData;
         
-        // Comprehensive master credentials check
         const masterCredentials: Record<string, { role: UserRole, name: string, id?: string, pass: string }> = {
           'admin@zenpayroll.ai': { role: 'Admin', name: 'Master Admin', pass: 'admin123' },
           'hr@zenpayroll.ai': { role: 'HR', name: 'HR Manager', pass: 'hr123' },
@@ -51,7 +50,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           return;
         }
 
-        // Check dynamic users from the database/localStorage
         const allCompanies = await api.getCompanies();
         let foundUser: Employee | null = null;
         for (const company of allCompanies) {
@@ -65,7 +63,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
         if (foundUser) {
           if (foundUser.status === 'Inactive') {
-            setError('Access Denied: Your account is currently Inactive. Please contact a Master Admin for activation.');
+            setError('Access Denied: Account pending Admin activation.');
           } else {
             onLogin({
               name: foundUser.name,
@@ -77,17 +75,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             });
           }
         } else {
-          setError('Authentication Failure: Identity or Keycode is incorrect.');
+          setError('Authentication Failure: Invalid Keycode.');
         }
       } else {
-        // Signup Flow
         const newEmployee: Employee = {
           id: 'USR' + Date.now(),
           name: formData.name,
           email: formData.email,
-          role: 'New User',
-          department: 'Unassigned',
-          status: 'Inactive', // Initial state is always inactive for new signups
+          role: 'New Registry',
+          department: 'General',
+          status: 'Inactive', 
           country: 'BD',
           joinDate: new Date().toISOString().split('T')[0],
           companyId: 'C001',
@@ -95,11 +92,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           salaryStructure: { basic: 0, hra: 0, transport: 0, medical: 0, customItems: [] }
         };
         await api.addEmployee(newEmployee);
-        setSuccessMsg('Registry Entry Created! Your account is pending Master Admin authorization.');
+        setSuccessMsg('Account created! Awaiting Admin activation before login.');
         setIsLogin(true);
       }
     } catch (err) {
-      setError('System Error: Central Authentication Registry is unreachable.');
+      setError('System Error: Authentication Registry down.');
     } finally {
       setLoading(false);
     }
@@ -114,19 +111,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-[440px] animate-in zoom-in-95 duration-500">
         
-        {/* Branding Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-xl shadow-blue-500/5 mb-4 border border-blue-50">
             <Sparkles className="w-8 h-8 text-[#1677ff]" />
           </div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight">ZenPayroll AI</h1>
-          <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-[0.3em]">Central Authentication Portal</p>
+          <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-[0.3em]">Premium Enterprise Access</p>
         </div>
 
-        {/* Main Card */}
         <div className="bg-white rounded-[32px] shadow-2xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
           
-          {/* Tab Switcher */}
           <div className="flex border-b border-slate-50 bg-slate-50/30">
             <button 
               onClick={() => { setIsLogin(true); setError(''); setSuccessMsg(''); }}
@@ -139,7 +133,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               onClick={() => { setIsLogin(false); setError(''); setSuccessMsg(''); }}
               className={`flex-1 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative ${!isLogin ? 'text-[#1677ff]' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              Request Access
+              Register
               {!isLogin && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#1677ff] rounded-t-full" />}
             </button>
           </div>
@@ -162,139 +156,80 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             <form onSubmit={handleAuth} className="space-y-5">
               {!isLogin && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Legal Identity</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Full Name</label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input 
-                      required 
-                      type="text" 
-                      className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 focus:border-[#1677ff] focus:ring-4 focus:ring-[#1677ff]/5 outline-none text-sm font-bold transition-all bg-white" 
-                      placeholder="e.g. John Doe"
-                      value={formData.name} 
-                      onChange={e => setFormData({...formData, name: e.target.value})} 
-                    />
+                    <input required type="text" className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 text-sm font-bold transition-all bg-white" placeholder="John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                   </div>
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Corporate Email</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Work Email</label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
-                    required 
-                    type="email" 
-                    className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 focus:border-[#1677ff] focus:ring-4 focus:ring-[#1677ff]/5 outline-none text-sm font-bold transition-all bg-white" 
-                    placeholder="name@zenpayroll.ai"
-                    value={formData.email} 
-                    onChange={e => setFormData({...formData, email: e.target.value})} 
-                  />
+                  <input required type="email" className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 text-sm font-bold transition-all bg-white" placeholder="admin@zenpayroll.ai" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Secure Keycode</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Keycode</label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
-                    required 
-                    type="password" 
-                    className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 focus:border-[#1677ff] focus:ring-4 focus:ring-[#1677ff]/5 outline-none text-sm font-bold transition-all bg-white" 
-                    placeholder="••••••••"
-                    value={formData.password} 
-                    onChange={e => setFormData({...formData, password: e.target.value})} 
-                  />
+                  <input required type="password" className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 text-sm font-bold transition-all bg-white" placeholder="••••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
                 </div>
               </div>
 
               <button 
                 type="submit"
                 disabled={loading}
-                className="w-full py-4.5 bg-[#1677ff] text-white rounded-[20px] font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-[#4096ff] transition-all shadow-xl shadow-blue-500/20 active:scale-95 disabled:bg-slate-300"
+                className="w-full py-4 bg-[#1677ff] text-white rounded-[20px] font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-[#4096ff] transition-all shadow-xl shadow-blue-500/20 active:scale-95 disabled:bg-slate-300"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : isLogin ? <Fingerprint className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                {isLogin ? 'Authorize Access' : 'Register Identity'}
+                {isLogin ? 'Grant Access' : 'Create Identity'}
               </button>
             </form>
 
-            <div className="mt-8 pt-8 border-t border-slate-50">
-              <p className="text-[9px] font-black text-slate-400 uppercase mb-4 flex items-center gap-2">
-                <Info className="w-3.5 h-3.5" /> Default Audit Credentials
-              </p>
-              
-              <div className="grid grid-cols-1 gap-2">
-                <button 
-                  onClick={() => setDemoCredentials('admin@zenpayroll.ai', 'admin123')}
-                  className="group flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-[#1677ff] hover:shadow-lg hover:shadow-blue-500/5 transition-all text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
-                      <ShieldCheck className="w-4 h-4" />
+            {isLogin && (
+              <div className="mt-8 pt-8 border-t border-slate-50">
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-4 flex items-center gap-2">
+                  <Info className="w-3.5 h-3.5" /> SYSTEM REGISTRY CREDENTIALS
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  <button onClick={() => setDemoCredentials('admin@zenpayroll.ai', 'admin123')} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-[#1677ff] transition-all text-left group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500"><ShieldCheck className="w-4 h-4" /></div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-700 uppercase">Admin</p>
+                        <p className="text-[9px] font-bold text-slate-400 mt-1">admin@zenpayroll.ai</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-700 uppercase leading-none">Admin</p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1">admin@zenpayroll.ai</p>
+                    <span className="text-[9px] font-black text-slate-300 group-hover:text-[#1677ff] uppercase">admin123</span>
+                  </button>
+                  <button onClick={() => setDemoCredentials('hr@zenpayroll.ai', 'hr123')} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-[#1677ff] transition-all text-left group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500"><User className="w-4 h-4" /></div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-700 uppercase">HR Manager</p>
+                        <p className="text-[9px] font-bold text-slate-400 mt-1">hr@zenpayroll.ai</p>
+                      </div>
                     </div>
-                  </div>
-                  <span className="text-[9px] font-black text-slate-300 group-hover:text-[#1677ff] uppercase">Key: admin123</span>
-                </button>
-
-                <button 
-                  onClick={() => setDemoCredentials('hr@zenpayroll.ai', 'hr123')}
-                  className="group flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-[#1677ff] hover:shadow-lg hover:shadow-blue-500/5 transition-all text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
-                      <User className="w-4 h-4" />
+                    <span className="text-[9px] font-black text-slate-300 group-hover:text-[#1677ff] uppercase">hr123</span>
+                  </button>
+                  <button onClick={() => setDemoCredentials('emp@zenpayroll.ai', 'emp123')} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-[#1677ff] transition-all text-left group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-500"><User className="w-4 h-4" /></div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-700 uppercase">Employee</p>
+                        <p className="text-[9px] font-bold text-slate-400 mt-1">emp@zenpayroll.ai</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-700 uppercase leading-none">HR Manager</p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1">hr@zenpayroll.ai</p>
-                    </div>
-                  </div>
-                  <span className="text-[9px] font-black text-slate-300 group-hover:text-[#1677ff] uppercase">Key: hr123</span>
-                </button>
-
-                <button 
-                  onClick={() => setDemoCredentials('acc@zenpayroll.ai', 'acc123')}
-                  className="group flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-[#1677ff] hover:shadow-lg hover:shadow-blue-500/5 transition-all text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500">
-                      <Briefcase className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-700 uppercase leading-none">Accountant</p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1">acc@zenpayroll.ai</p>
-                    </div>
-                  </div>
-                  <span className="text-[9px] font-black text-slate-300 group-hover:text-[#1677ff] uppercase">Key: acc123</span>
-                </button>
-
-                <button 
-                  onClick={() => setDemoCredentials('emp@zenpayroll.ai', 'emp123')}
-                  className="group flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-[#1677ff] hover:shadow-lg hover:shadow-blue-500/5 transition-all text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-500">
-                      <User className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-700 uppercase leading-none">Employee</p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1">emp@zenpayroll.ai</p>
-                    </div>
-                  </div>
-                  <span className="text-[9px] font-black text-slate-300 group-hover:text-[#1677ff] uppercase">Key: emp123</span>
-                </button>
+                    <span className="text-[9px] font-black text-slate-300 group-hover:text-[#1677ff] uppercase">emp123</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        </div>
-
-        <div className="mt-8 text-center flex justify-center gap-6 opacity-30 grayscale">
-           <img src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg" alt="Stripe" className="h-4" />
-           <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4" />
-           <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-4" />
         </div>
       </div>
     </div>

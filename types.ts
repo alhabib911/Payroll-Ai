@@ -29,7 +29,7 @@ export interface Employee {
   country: Country;
   joinDate: string;
   companyId: string;
-  systemRole: UserRole; // Added to track system access level
+  systemRole: UserRole;
 }
 
 export interface PayrollRecord {
@@ -63,7 +63,7 @@ export interface LeaveRequest {
   endDate: string;
   reason: string;
   status: 'Pending' | 'Approved' | 'Rejected';
-  paymentStatus?: 'Paid' | 'Unpaid'; // Added for HR to define
+  paymentStatus?: 'Paid' | 'Unpaid';
   appliedAt: string;
 }
 
@@ -76,17 +76,11 @@ export interface Company {
   defaultCountry: Country;
 }
 
-export interface AIInsight {
-  type: 'saving' | 'warning' | 'info';
-  message: string;
-  action?: string;
-}
-
 export interface AdminProfile {
   name: string;
   email: string;
   role: UserRole;
   avatar: string;
   isLoggedIn: boolean;
-  employeeId?: string; // Links to Employee record if role is 'Employee'
+  employeeId?: string;
 }

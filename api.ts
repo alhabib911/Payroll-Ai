@@ -7,13 +7,13 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export const api = {
   // Companies
   getCompanies: async (): Promise<Company[]> => {
-    await delay(300);
+    await delay(200);
     const stored = localStorage.getItem('zp_companies');
     return stored ? JSON.parse(stored) : COMPANIES;
   },
 
   addCompany: async (company: Company): Promise<Company[]> => {
-    await delay(500);
+    await delay(400);
     const stored = localStorage.getItem('zp_companies');
     const all = stored ? JSON.parse(stored) : COMPANIES;
     const updated = [...all, company];
@@ -22,7 +22,7 @@ export const api = {
   },
 
   deleteCompany: async (id: string): Promise<Company[]> => {
-    await delay(500);
+    await delay(400);
     const stored = localStorage.getItem('zp_companies');
     const all: Company[] = stored ? JSON.parse(stored) : COMPANIES;
     const updated = all.filter(c => c.id !== id);
@@ -32,13 +32,13 @@ export const api = {
 
   // Departments
   getDepartments: async (): Promise<string[]> => {
-    await delay(200);
+    await delay(100);
     const stored = localStorage.getItem('zp_departments');
     return stored ? JSON.parse(stored) : DEPARTMENTS;
   },
 
   addDepartment: async (dept: string): Promise<string[]> => {
-    await delay(300);
+    await delay(200);
     const stored = localStorage.getItem('zp_departments');
     const all = stored ? JSON.parse(stored) : DEPARTMENTS;
     if (all.includes(dept)) return all;
@@ -48,7 +48,7 @@ export const api = {
   },
 
   deleteDepartment: async (dept: string): Promise<string[]> => {
-    await delay(300);
+    await delay(200);
     const stored = localStorage.getItem('zp_departments');
     const all: string[] = stored ? JSON.parse(stored) : DEPARTMENTS;
     const updated = all.filter(d => d !== dept);
@@ -58,14 +58,14 @@ export const api = {
 
   // Employees
   getEmployees: async (companyId: string): Promise<Employee[]> => {
-    await delay(400);
+    await delay(300);
     const stored = localStorage.getItem('zp_employees');
     const allEmployees: Employee[] = stored ? JSON.parse(stored) : INITIAL_EMPLOYEES;
     return allEmployees.filter(emp => emp.companyId === companyId);
   },
 
   addEmployee: async (employee: Employee): Promise<Employee> => {
-    await delay(500);
+    await delay(400);
     const stored = localStorage.getItem('zp_employees');
     const all: Employee[] = stored ? JSON.parse(stored) : INITIAL_EMPLOYEES;
     const updated = [...all, employee];
@@ -74,7 +74,7 @@ export const api = {
   },
 
   updateEmployee: async (employee: Employee): Promise<Employee> => {
-    await delay(500);
+    await delay(400);
     const stored = localStorage.getItem('zp_employees');
     const all: Employee[] = stored ? JSON.parse(stored) : INITIAL_EMPLOYEES;
     const updated = all.map(emp => emp.id === employee.id ? employee : emp);
@@ -84,14 +84,14 @@ export const api = {
 
   // Payroll
   getPayrollRecords: async (companyId: string): Promise<PayrollRecord[]> => {
-    await delay(300);
+    await delay(200);
     const stored = localStorage.getItem('zp_payroll');
     const all: PayrollRecord[] = stored ? JSON.parse(stored) : [];
     return all.filter(rec => rec.companyId === companyId);
   },
 
   savePayrollRecord: async (record: PayrollRecord): Promise<PayrollRecord> => {
-    await delay(500);
+    await delay(400);
     const stored = localStorage.getItem('zp_payroll');
     const all: PayrollRecord[] = stored ? JSON.parse(stored) : [];
     const updated = [...all, record];
@@ -99,22 +99,22 @@ export const api = {
     return record;
   },
 
-  // Leave
+  // Leave Management
   getLeaveRequests: async (employeeId: string): Promise<LeaveRequest[]> => {
-    await delay(300);
+    await delay(200);
     const stored = localStorage.getItem('zp_leaves');
     const all: LeaveRequest[] = stored ? JSON.parse(stored) : [];
     return all.filter(l => l.employeeId === employeeId);
   },
 
   getAllLeaveRequests: async (): Promise<LeaveRequest[]> => {
-    await delay(400);
+    await delay(300);
     const stored = localStorage.getItem('zp_leaves');
     return stored ? JSON.parse(stored) : [];
   },
 
   addLeaveRequest: async (req: LeaveRequest): Promise<LeaveRequest> => {
-    await delay(500);
+    await delay(400);
     const stored = localStorage.getItem('zp_leaves');
     const all: LeaveRequest[] = stored ? JSON.parse(stored) : [];
     const updated = [...all, req];
@@ -123,31 +123,11 @@ export const api = {
   },
 
   updateLeaveRequest: async (req: LeaveRequest): Promise<LeaveRequest> => {
-    await delay(400);
+    await delay(300);
     const stored = localStorage.getItem('zp_leaves');
     const all: LeaveRequest[] = stored ? JSON.parse(stored) : [];
     const updated = all.map(l => l.id === req.id ? req : l);
     localStorage.setItem('zp_leaves', JSON.stringify(updated));
     return req;
-  },
-
-  // Profile
-  getProfile: async (): Promise<AdminProfile> => {
-    const stored = localStorage.getItem('zp_profile');
-    if (stored) return JSON.parse(stored);
-    
-    // Default fallback
-    return {
-      name: 'Premium Administrator',
-      email: 'admin@zenpayroll.ai',
-      role: 'Admin',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
-      isLoggedIn: false
-    };
-  },
-
-  updateProfile: async (profile: AdminProfile): Promise<AdminProfile> => {
-    localStorage.setItem('zp_profile', JSON.stringify(profile));
-    return profile;
   }
 };

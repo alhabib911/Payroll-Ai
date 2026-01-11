@@ -26,6 +26,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     country: 'BD',
     joinDate: '2023-01-15',
     companyId: 'C001',
+    systemRole: 'Employee',
     salaryStructure: {
       basic: 60000,
       hra: 25000,
@@ -47,6 +48,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     country: 'KSA',
     joinDate: '2022-11-20',
     companyId: 'C002',
+    systemRole: 'Admin',
     salaryStructure: {
       basic: 12000,
       hra: 4000,

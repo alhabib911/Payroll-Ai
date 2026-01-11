@@ -1,5 +1,5 @@
 
-import { Employee, Company, PayrollRecord, AdminProfile } from './types';
+import { Employee, Company, PayrollRecord, AdminProfile, LeaveRequest } from './types';
 import { INITIAL_EMPLOYEES, COMPANIES, DEPARTMENTS } from './constants';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -73,6 +73,15 @@ export const api = {
     return employee;
   },
 
+  updateEmployee: async (employee: Employee): Promise<Employee> => {
+    await delay(500);
+    const stored = localStorage.getItem('zp_employees');
+    const all: Employee[] = stored ? JSON.parse(stored) : INITIAL_EMPLOYEES;
+    const updated = all.map(emp => emp.id === employee.id ? employee : emp);
+    localStorage.setItem('zp_employees', JSON.stringify(updated));
+    return employee;
+  },
+
   // Payroll
   getPayrollRecords: async (companyId: string): Promise<PayrollRecord[]> => {
     await delay(300);
@@ -88,6 +97,38 @@ export const api = {
     const updated = [...all, record];
     localStorage.setItem('zp_payroll', JSON.stringify(updated));
     return record;
+  },
+
+  // Leave
+  getLeaveRequests: async (employeeId: string): Promise<LeaveRequest[]> => {
+    await delay(300);
+    const stored = localStorage.getItem('zp_leaves');
+    const all: LeaveRequest[] = stored ? JSON.parse(stored) : [];
+    return all.filter(l => l.employeeId === employeeId);
+  },
+
+  getAllLeaveRequests: async (): Promise<LeaveRequest[]> => {
+    await delay(400);
+    const stored = localStorage.getItem('zp_leaves');
+    return stored ? JSON.parse(stored) : [];
+  },
+
+  addLeaveRequest: async (req: LeaveRequest): Promise<LeaveRequest> => {
+    await delay(500);
+    const stored = localStorage.getItem('zp_leaves');
+    const all: LeaveRequest[] = stored ? JSON.parse(stored) : [];
+    const updated = [...all, req];
+    localStorage.setItem('zp_leaves', JSON.stringify(updated));
+    return req;
+  },
+
+  updateLeaveRequest: async (req: LeaveRequest): Promise<LeaveRequest> => {
+    await delay(400);
+    const stored = localStorage.getItem('zp_leaves');
+    const all: LeaveRequest[] = stored ? JSON.parse(stored) : [];
+    const updated = all.map(l => l.id === req.id ? req : l);
+    localStorage.setItem('zp_leaves', JSON.stringify(updated));
+    return req;
   },
 
   // Profile

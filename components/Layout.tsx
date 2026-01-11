@@ -4,19 +4,20 @@ import {
   LayoutDashboard, 
   Users, 
   Wallet, 
-  PieChart, 
   Menu,
   X,
   Sparkles,
   ChevronDown,
-  Globe,
   Plus,
   Trash2,
   ClipboardList,
   LogOut,
   Bell,
   Settings,
-  Search
+  CalendarPlus,
+  History,
+  ShieldAlert,
+  ClipboardCheck
 } from 'lucide-react';
 import { Company, Language, AdminProfile } from '../types';
 import { translations } from '../translations';
@@ -68,11 +69,14 @@ const Layout: React.FC<LayoutProps> = ({
   const t = translations[language];
 
   const allMenuItems = [
-    { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard, roles: ['Admin', 'HR', 'Accountant'] },
+    { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard, roles: ['Admin', 'HR', 'Accountant', 'Employee'] },
     { id: 'employees', label: t.employees, icon: Users, roles: ['Admin', 'HR'] },
     { id: 'payroll', label: t.payroll, icon: Wallet, roles: ['Admin', 'Accountant'] },
-    { id: 'ledger', label: t.ledger, icon: ClipboardList, roles: ['Admin', 'Accountant'] },
-    { id: 'reports', label: t.insights, icon: PieChart, roles: ['Admin', 'HR'] },
+    { id: 'ledger', label: profile.role === 'Employee' ? t.myPayroll : t.ledger, icon: ClipboardList, roles: ['Admin', 'Accountant', 'Employee'] },
+    { id: 'leave-management', label: t.leaveManagement, icon: ClipboardCheck, roles: ['Admin', 'HR'] },
+    { id: 'role-management', label: t.roleManagement, icon: ShieldAlert, roles: ['Admin'] },
+    { id: 'leave-request', label: t.leaveRequest, icon: CalendarPlus, roles: ['Employee'] },
+    { id: 'leave-history', label: t.leaveHistory, icon: History, roles: ['Employee'] },
   ];
 
   const menuItems = allMenuItems.filter(item => item.roles.includes(profile.role));
@@ -119,7 +123,7 @@ const Layout: React.FC<LayoutProps> = ({
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* Persistent Sidebar (Ant Design Dark Theme) */}
+      {/* Persistent Sidebar */}
       <aside className={`
         fixed lg:sticky lg:top-0 lg:h-screen inset-y-0 ${language === 'ar' ? 'right-0' : 'left-0'} z-50 w-64 bg-[#001529] text-white transition-all duration-300 transform
         ${isSidebarOpen ? 'translate-x-0' : (language === 'ar' ? 'translate-x-full lg:translate-x-0' : '-translate-x-full lg:translate-x-0')}
@@ -135,71 +139,73 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
         </div>
 
-        {/* Company Selector */}
-        <div className="px-4 py-4 shrink-0">
-          <div className="relative">
-            <button 
-              onClick={() => setShowCompanyMenu(!showCompanyMenu)}
-              className="w-full flex items-center justify-between p-2.5 bg-white/5 rounded-md border border-white/10 hover:bg-white/10 transition-all active:scale-[0.98]"
-            >
-              <div className="flex items-center gap-2.5 overflow-hidden">
-                <div className="w-7 h-7 flex-shrink-0 rounded bg-white/10 flex items-center justify-center text-sm">
-                  {currentCompany ? currentCompany.logo : '🏢'}
+        {/* Company Selector - Hidden for Employees */}
+        {profile.role !== 'Employee' && (
+          <div className="px-4 py-4 shrink-0">
+            <div className="relative">
+              <button 
+                onClick={() => setShowCompanyMenu(!showCompanyMenu)}
+                className="w-full flex items-center justify-between p-2.5 bg-white/5 rounded-md border border-white/10 hover:bg-white/10 transition-all active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className="w-7 h-7 flex-shrink-0 rounded bg-white/10 flex items-center justify-center text-sm">
+                    {currentCompany ? currentCompany.logo : '🏢'}
+                  </div>
+                  <div className="text-left overflow-hidden">
+                    <p className="text-[11px] font-bold truncate text-white/80">
+                      {currentCompany ? currentCompany.name : 'Initializing...'}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-left overflow-hidden">
-                  <p className="text-[11px] font-bold truncate text-white/80">
-                    {currentCompany ? currentCompany.name : 'Initializing...'}
-                  </p>
-                </div>
-              </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-white/40 transition-transform duration-300 ${showCompanyMenu ? 'rotate-180' : ''}`} />
-            </button>
+                <ChevronDown className={`w-3.5 h-3.5 text-white/40 transition-transform duration-300 ${showCompanyMenu ? 'rotate-180' : ''}`} />
+              </button>
 
-            {showCompanyMenu && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-[#001529] border border-white/10 rounded-md shadow-2xl z-[60] overflow-hidden py-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="max-h-60 overflow-y-auto">
-                  {companies.map(company => (
-                    <div
-                      key={company.id}
-                      onClick={() => {
-                        onCompanyChange(company);
-                        setShowCompanyMenu(false);
-                      }}
-                      className={`px-4 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${company.id === currentCompany?.id ? 'bg-[#1677ff] text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span>{company.logo}</span>
-                        <span className="truncate max-w-[120px]">{company.name}</span>
+              {showCompanyMenu && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-[#001529] border border-white/10 rounded-md shadow-2xl z-[60] overflow-hidden py-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="max-h-60 overflow-y-auto">
+                    {companies.map(company => (
+                      <div
+                        key={company.id}
+                        onClick={() => {
+                          onCompanyChange(company);
+                          setShowCompanyMenu(false);
+                        }}
+                        className={`px-4 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${company.id === currentCompany?.id ? 'bg-[#1677ff] text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span>{company.logo}</span>
+                          <span className="truncate max-w-[120px]">{company.name}</span>
+                        </div>
+                        {companies.length > 1 && profile.role === 'Admin' && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCompanyToDelete(company.id);
+                            }} 
+                            className="p-1 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
-                      {companies.length > 1 && profile.role === 'Admin' && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCompanyToDelete(company.id);
-                          }} 
-                          className="p-1 hover:text-red-400 transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  {profile.role === 'Admin' && (
+                    <button 
+                      onClick={() => { setShowAddCompany(true); setShowCompanyMenu(false); }}
+                      className="w-full px-4 py-2 border-t border-white/5 text-[10px] font-bold text-[#1677ff] flex items-center gap-2 hover:bg-white/5 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" /> {t.addCompany}
+                    </button>
+                  )}
                 </div>
-                {profile.role === 'Admin' && (
-                  <button 
-                    onClick={() => { setShowAddCompany(true); setShowCompanyMenu(false); }}
-                    className="w-full px-4 py-2 border-t border-white/5 text-[10px] font-bold text-[#1677ff] flex items-center gap-2 hover:bg-white/5 transition-colors"
-                  >
-                    <Plus className="w-3 h-3" /> {t.addCompany}
-                  </button>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        )}
         
         {/* Navigation Menu */}
-        <nav className="flex-1 px-2 space-y-0.5 mt-2 overflow-y-auto">
+        <nav className="flex-1 px-2 space-y-0.5 mt-4 overflow-y-auto">
           {menuItems.map((item) => (
             <button
               key={item.id}
@@ -246,14 +252,13 @@ const Layout: React.FC<LayoutProps> = ({
 
       {/* Main Container */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* Sticky Header (Ant Design Pro Style) */}
         <header className="h-16 bg-white border-b border-[#f0f0f0] sticky top-0 z-40 flex items-center justify-between px-6 shrink-0 shadow-sm no-print">
           <div className="flex items-center gap-4">
             <button className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-md" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-              <span>{t.organization}</span>
+              <span>{profile.role === 'Employee' ? 'Personal Account' : t.organization}</span>
               <span className="text-slate-300">/</span>
               <span className="text-slate-900 font-semibold">{allMenuItems.find(i => i.id === activeTab)?.label}</span>
             </div>
@@ -283,7 +288,6 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
         </header>
 
-        {/* Dynamic Content Body */}
         <div className="flex-1 overflow-y-auto bg-[#f0f2f5] p-6 lg:p-8">
           <div className="max-w-7xl mx-auto h-full">
             {children}
@@ -291,7 +295,6 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
       </main>
 
-      {/* Corporate Entity Provisioning Modal */}
       {showAddCompany && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-white rounded-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">

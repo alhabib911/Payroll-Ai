@@ -1,6 +1,6 @@
 
-import React, { useEffect, useState } from 'react';
-import { Sparkles, Loader2, Printer, CheckCircle2, Calculator, ArrowLeft, BadgeCheck, FileText, AlertTriangle, TrendingDown } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Sparkles, Loader2, Printer, CheckCircle2, Calculator, ArrowLeft, BadgeCheck, FileText, AlertTriangle, TrendingDown, Percent, Clock, Banknote, CalendarX, PartyPopper } from 'lucide-react';
 import { Employee, PayrollRecord, Company } from '../types';
 import { calculatePayrollWithAI } from '../services/geminiService';
 import { COUNTRIES } from '../constants';
@@ -21,41 +21,84 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
   initialRecord,
   onClearInitialRecord
 }) => {
-  const [selectedEmpId, setSelectedEmpId] = React.useState('');
-  const [overtime, setOvertime] = React.useState(0);
-  const [bonus, setBonus] = React.useState(0);
-  const [leaves, setLeaves] = React.useState(0);
-  const [loading, setLoading] = React.useState(false);
-  const [result, setResult] = React.useState<any>(null);
-  const [view, setView] = React.useState<'input' | 'payslip'>('input');
+  const [selectedEmpId, setSelectedEmpId] = useState('');
+  const [overtime, setOvertime] = useState(0);
+  const [overtimeRate, setOvertimeRate] = useState(0);
+  const [bonus, setBonus] = useState(0);
+  const [leaves, setLeaves] = useState(0);
+  const [leaveRate, setLeaveRate] = useState(0);
+  const [taxPercent, setTaxPercent] = useState(0);
+  const [vatPercent, setVatPercent] = useState(0);
+  
+  const [loading, setLoading] = useState(false);
+  const [aiAudit, setAiAudit] = useState<any>(null);
+  const [view, setView] = useState<'input' | 'payslip'>('input');
   const [showConfirmDisburse, setShowConfirmDisburse] = useState(false);
+  const [successState, setSuccessState] = useState(false);
+
+  const selectedEmployee = employees.find(e => e.id === selectedEmpId);
+
+  // Real-time calculation math
+  const calculatedData = useMemo(() => {
+    if (!selectedEmployee) return null;
+    
+    const basePay = selectedEmployee.salaryStructure.basic + 
+                    selectedEmployee.salaryStructure.hra + 
+                    selectedEmployee.salaryStructure.transport + 
+                    selectedEmployee.salaryStructure.medical;
+    
+    const otTotal = overtime * overtimeRate;
+    const leaveDeduction = leaves * leaveRate;
+    const grossSalary = basePay + otTotal + bonus;
+    
+    const taxAmount = (grossSalary * taxPercent) / 100;
+    const vatAmount = (grossSalary * vatPercent) / 100;
+    const totalDeductions = leaveDeduction + taxAmount + vatAmount;
+    
+    const netSalary = grossSalary - totalDeductions;
+
+    return {
+      basePay,
+      otTotal,
+      leaveDeduction,
+      grossSalary,
+      taxAmount,
+      vatAmount,
+      netSalary
+    };
+  }, [selectedEmployee, overtime, overtimeRate, bonus, leaves, leaveRate, taxPercent, vatPercent]);
 
   useEffect(() => {
     if (initialRecord) {
-      setResult({
-        grossSalary: initialRecord.grossSalary,
-        tax: initialRecord.tax,
-        complianceDeductions: initialRecord.otherDeductions,
-        netSalary: initialRecord.netSalary,
-        breakdown: initialRecord.breakdown
-      });
       setSelectedEmpId(initialRecord.employeeId);
       setOvertime(initialRecord.overtimeHours);
+      setOvertimeRate(initialRecord.overtimeRate);
       setBonus(initialRecord.bonuses);
       setLeaves(initialRecord.unpaidLeaves);
+      setLeaveRate(initialRecord.unpaidLeaveRate);
+      setTaxPercent(initialRecord.taxPercent);
+      setVatPercent(initialRecord.vatPercent);
+      setAiAudit({ taxExplanation: initialRecord.breakdown?.taxExplanation });
       setView('payslip');
     }
   }, [initialRecord]);
-
-  const selectedEmployee = employees.find(e => e.id === selectedEmpId);
 
   const handleCalculate = async () => {
     if (!selectedEmployee) return;
     setLoading(true);
     try {
-      const data = await calculatePayrollWithAI(selectedEmployee, overtime, bonus, leaves);
-      if (data) {
-        setResult(data);
+      const audit = await calculatePayrollWithAI(
+        selectedEmployee, 
+        overtime, 
+        overtimeRate, 
+        bonus, 
+        leaves, 
+        leaveRate, 
+        taxPercent, 
+        vatPercent
+      );
+      if (audit) {
+        setAiAudit(audit);
       }
     } catch (err) {
       console.error(err);
@@ -70,7 +113,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
   };
 
   const executeDisbursement = () => {
-    if (!result || !selectedEmpId) return;
+    if (!calculatedData || !selectedEmpId) return;
     
     const now = new Date();
     const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(now);
@@ -82,34 +125,71 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
         companyId: currentCompany.id,
         month: currentMonth,
         year: currentYear,
-        grossSalary: result.grossSalary,
-        netSalary: result.netSalary,
-        tax: result.tax,
-        otherDeductions: result.complianceDeductions,
+        grossSalary: calculatedData.grossSalary,
+        netSalary: calculatedData.netSalary,
+        tax: calculatedData.taxAmount,
+        vat: calculatedData.vatAmount,
+        otherDeductions: calculatedData.leaveDeduction,
         bonuses: bonus,
         overtimeHours: overtime,
+        overtimeRate: overtimeRate,
         unpaidLeaves: leaves,
+        unpaidLeaveRate: leaveRate,
+        taxPercent: taxPercent,
+        vatPercent: vatPercent,
         status: 'Paid',
-        breakdown: result.breakdown,
+        breakdown: {
+            taxExplanation: aiAudit?.taxExplanation || "System generated audit validation.",
+            otTotal: calculatedData.otTotal,
+            leaveDeduction: calculatedData.leaveDeduction
+        },
         generatedAt: now.toISOString()
     };
+    
     onRecordCreated(record);
-    setResult(null);
-    setSelectedEmpId('');
-    setView('input');
     setShowConfirmDisburse(false);
+    setSuccessState(true);
+    
+    // Auto reset after 3 seconds
+    setTimeout(() => {
+        setSuccessState(false);
+        setSelectedEmpId('');
+        setAiAudit(null);
+        setView('input');
+        setOvertime(0);
+        setBonus(0);
+        setLeaves(0);
+        setTaxPercent(0);
+        setVatPercent(0);
+    }, 2500);
   };
 
-  const getDisplayPeriod = () => {
-    if (initialRecord) {
-      return `${initialRecord.month} ${initialRecord.year}`;
-    }
-    const now = new Date();
-    const month = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(now);
-    return `${month} ${now.getFullYear()}`;
+  const handleNumericInput = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: number) => void) => {
+    const val = e.target.value === '' ? 0 : Number(e.target.value);
+    setter(val);
   };
 
-  if (view === 'payslip' && result && selectedEmployee) {
+  if (successState) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] animate-in zoom-in duration-300">
+          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6 border border-green-100 shadow-lg shadow-green-500/10">
+              <PartyPopper className="w-10 h-10 text-green-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Disbursement Successful!</h2>
+          <p className="text-slate-400 font-medium mb-8">Salary record has been committed to the secure ledger.</p>
+          <div className="flex gap-2">
+              <div className="px-4 py-2 bg-slate-100 rounded text-slate-500 font-bold text-[10px] uppercase tracking-widest">
+                  LEDGER UPDATED
+              </div>
+              <div className="px-4 py-2 bg-slate-100 rounded text-slate-500 font-bold text-[10px] uppercase tracking-widest">
+                  DASHBOARD SYNCED
+              </div>
+          </div>
+      </div>
+    );
+  }
+
+  if (view === 'payslip' && calculatedData && selectedEmployee) {
     return (
       <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-400 pb-10">
         <div className="mb-6 flex justify-between items-center no-print">
@@ -122,7 +202,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
               </button>
               {!initialRecord && (
                 <button onClick={() => setShowConfirmDisburse(true)} className="flex items-center gap-2 px-4 py-2 bg-[#52c41a] text-white rounded font-bold text-xs shadow-md hover:bg-[#73d13d] transition-all">
-                    <CheckCircle2 className="w-4 h-4" /> DISBURSE FUNDS
+                    <CheckCircle2 className="w-4 h-4" /> CONFIRM DISBURSEMENT
                 </button>
               )}
             </div>
@@ -135,37 +215,37 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
                         <span className="text-3xl">{currentCompany.logo}</span>
                         <h2 className="text-xl font-bold text-slate-900 tracking-tight uppercase">{currentCompany.name}</h2>
                     </div>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Official Remuneration Advice</p>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Remuneration Advice & Audit Log</p>
                 </div>
                 <div className="text-right">
                     <span className="px-3 py-1 bg-blue-50 text-[#1677ff] rounded border border-blue-100 font-bold uppercase text-[10px] tracking-widest">
-                        {getDisplayPeriod()}
+                        {initialRecord ? `${initialRecord.month} ${initialRecord.year}` : 'Current Cycle'}
                     </span>
                 </div>
             </div>
 
             <div className="grid grid-cols-2 gap-10 mb-10">
                 <div className="space-y-4">
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Employee Summary</h4>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Recipient Information</h4>
                     <div className="grid grid-cols-2 gap-y-3 text-xs">
-                        <span className="text-slate-500 font-medium">Name:</span>
+                        <span className="text-slate-500 font-medium">Full Name:</span>
                         <span className="font-bold text-slate-800">{selectedEmployee.name}</span>
-                        <span className="text-slate-500 font-medium">Staff ID:</span>
+                        <span className="text-slate-500 font-medium">Staff Identity:</span>
                         <span className="font-bold text-slate-800">{selectedEmployee.id}</span>
-                        <span className="text-slate-500 font-medium">Jurisdiction:</span>
+                        <span className="text-slate-500 font-medium">Tax Region:</span>
                         <span className="font-bold text-slate-800 uppercase">{selectedEmployee.country}</span>
                     </div>
                 </div>
                 <div className="space-y-4">
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Cycle Attendance</h4>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Summary Metrics</h4>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="bg-slate-50 p-3 rounded border border-slate-100 text-center">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">OT (HRS)</p>
-                            <p className="text-lg font-bold text-slate-800">{overtime}</p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase">Gross Income</p>
+                            <p className="text-sm font-bold text-slate-800">{currentCompany.symbol}{calculatedData.grossSalary.toLocaleString()}</p>
                         </div>
                         <div className="bg-slate-50 p-3 rounded border border-slate-100 text-center">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">Unpaid (D)</p>
-                            <p className="text-lg font-bold text-slate-800">{leaves}</p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase">Deductions</p>
+                            <p className="text-sm font-bold text-red-500">-{currentCompany.symbol}{(calculatedData.grossSalary - calculatedData.netSalary).toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
@@ -174,44 +254,40 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
             <div className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     <div className="space-y-3">
-                        <h4 className="text-[11px] font-bold uppercase text-green-600 border-b border-green-100 pb-2">Allowances</h4>
+                        <h4 className="text-[11px] font-bold uppercase text-green-600 border-b border-green-100 pb-2">Income Items</h4>
                         <div className="space-y-2 text-xs">
                             <div className="flex justify-between">
-                                <span className="text-slate-500">Basic Wage</span>
-                                <span className="font-bold text-slate-800">{currentCompany.symbol}{selectedEmployee.salaryStructure.basic.toLocaleString()}</span>
+                                <span className="text-slate-500">Fixed Components</span>
+                                <span className="font-bold text-slate-800">{currentCompany.symbol}{calculatedData.basePay.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-slate-500">Housing Benefit</span>
-                                <span className="font-bold text-slate-800">{currentCompany.symbol}{selectedEmployee.salaryStructure.hra.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-slate-500">One-time Bonus</span>
+                                <span className="text-slate-500">Bonus Allocation</span>
                                 <span className="font-bold text-green-600">+{currentCompany.symbol}{bonus.toLocaleString()}</span>
                             </div>
-                            {result.breakdown.overtimePay > 0 && (
+                            {calculatedData.otTotal > 0 && (
                                 <div className="flex justify-between">
-                                    <span className="text-slate-500">Overtime Pay</span>
-                                    <span className="font-bold text-slate-800">{currentCompany.symbol}{result.breakdown.overtimePay.toLocaleString()}</span>
+                                    <span className="text-slate-500">Overtime ({overtime} hrs @ {overtimeRate})</span>
+                                    <span className="font-bold text-slate-800">{currentCompany.symbol}{calculatedData.otTotal.toLocaleString()}</span>
                                 </div>
                             )}
                         </div>
                     </div>
                     <div className="space-y-3">
-                        <h4 className="text-[11px] font-bold uppercase text-red-600 border-b border-red-100 pb-2">Deductions</h4>
+                        <h4 className="text-[11px] font-bold uppercase text-red-600 border-b border-red-100 pb-2">Statutory & Adjustments</h4>
                         <div className="space-y-2 text-xs">
-                            {result.breakdown.leaveDeduction > 0 && (
+                            {calculatedData.leaveDeduction > 0 && (
                               <div className="flex justify-between">
-                                  <span className="text-slate-500">Unpaid Leave Adjustment</span>
-                                  <span className="font-bold text-red-600">-{currentCompany.symbol}{result.breakdown.leaveDeduction.toLocaleString()}</span>
+                                  <span className="text-slate-500">Unpaid Leave ({leaves} days @ {leaveRate})</span>
+                                  <span className="font-bold text-red-600">-{currentCompany.symbol}{calculatedData.leaveDeduction.toLocaleString()}</span>
                               </div>
                             )}
                             <div className="flex justify-between">
-                                <span className="text-slate-500">Income Tax (Est.)</span>
-                                <span className="font-bold text-red-600">-{currentCompany.symbol}{result.tax.toLocaleString()}</span>
+                                <span className="text-slate-500">Income Tax ({taxPercent}%)</span>
+                                <span className="font-bold text-red-600">-{currentCompany.symbol}{calculatedData.taxAmount.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-slate-500">Compliance/Govt.</span>
-                                <span className="font-bold text-red-600">-{currentCompany.symbol}{result.complianceDeductions.toLocaleString()}</span>
+                                <span className="text-slate-500">VAT Deduction ({vatPercent}%)</span>
+                                <span className="font-bold text-red-600">-{currentCompany.symbol}{calculatedData.vatAmount.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
@@ -219,14 +295,14 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
 
                 <div className="bg-[#001529] rounded-lg p-6 text-white flex justify-between items-center shadow-lg">
                     <div>
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-1">Total Net Disbursement</p>
-                        <p className="text-3xl font-bold">{currentCompany.symbol}{result.netSalary.toLocaleString()}</p>
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-1">Final Net Payout</p>
+                        <p className="text-3xl font-bold">{currentCompany.symbol}{calculatedData.netSalary.toLocaleString()}</p>
                     </div>
-                    <div className="text-right hidden sm:block">
-                        <div className="flex items-center gap-2 text-[#52c41a] font-bold mb-1 text-xs">
-                            <BadgeCheck className="w-4 h-4" /> AI Validated
+                    <div className="text-right hidden sm:block max-w-[200px]">
+                        <div className="flex items-center justify-end gap-2 text-[#52c41a] font-bold mb-1 text-xs">
+                            <BadgeCheck className="w-4 h-4" /> Auditor Verified
                         </div>
-                        <p className="text-[10px] text-white/40 italic">{result.breakdown.taxExplanation}</p>
+                        <p className="text-[10px] text-white/40 italic leading-tight">{aiAudit?.taxExplanation || "Validated against organizational compliance rules."}</p>
                     </div>
                 </div>
             </div>
@@ -234,11 +310,11 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
 
         <ConfirmationModal 
             isOpen={showConfirmDisburse}
-            title="Approve Payout?"
-            message={`Verify disbursement of ${currentCompany.symbol}${result.netSalary.toLocaleString()} for ${selectedEmployee.name}.`}
+            title="Authorize Payout?"
+            message={`Confirming final payment of ${currentCompany.symbol}${calculatedData.netSalary.toLocaleString()} for ${selectedEmployee.name}.`}
             onConfirm={executeDisbursement}
             onCancel={() => setShowConfirmDisburse(false)}
-            confirmText="CONFIRM"
+            confirmText="AUTHORIZE"
             type="info"
         />
       </div>
@@ -257,11 +333,11 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Select Employee</label>
             <select 
-              className="w-full px-3 py-2 rounded border border-[#d9d9d9] bg-white outline-none focus:border-[#1677ff] text-sm font-medium transition-all"
+              className="w-full px-3 py-2.5 rounded border border-[#d9d9d9] bg-white outline-none focus:border-[#1677ff] text-sm font-medium transition-all"
               value={selectedEmpId}
               onChange={(e) => setSelectedEmpId(e.target.value)}
             >
-              <option value="">Choose Registry ID...</option>
+              <option value="">Search Employee Database...</option>
               {employees.map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
               ))}
@@ -269,83 +345,174 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
           </div>
 
           {selectedEmployee && (
-            <div className="p-4 bg-slate-50 rounded border border-slate-100 animate-in slide-in-from-top-2">
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Current Structure</p>
-              <div className="grid grid-cols-2 gap-y-1 text-[11px] font-medium text-slate-600">
-                <span>Basic:</span><span className="text-right font-bold text-slate-800">{currentCompany.symbol}{selectedEmployee.salaryStructure.basic.toLocaleString()}</span>
-                <span>Allowances:</span><span className="text-right font-bold text-slate-800">{currentCompany.symbol}{selectedEmployee.salaryStructure.hra.toLocaleString()}</span>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-300">
+               {/* Overtime Block */}
+               <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-[10px] font-bold text-blue-700 uppercase">Overtime Config</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Hours</p>
+                      <input 
+                        type="number" 
+                        onFocus={(e) => e.target.select()}
+                        className="w-full px-2 py-1 rounded border border-white bg-white text-xs outline-none focus:border-blue-500" 
+                        value={overtime} 
+                        onChange={e => handleNumericInput(e, setOvertime)} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Rate/Hr</p>
+                      <input 
+                        type="number" 
+                        onFocus={(e) => e.target.select()}
+                        className="w-full px-2 py-1 rounded border border-white bg-white text-xs outline-none focus:border-blue-500" 
+                        value={overtimeRate} 
+                        onChange={e => handleNumericInput(e, setOvertimeRate)} 
+                      />
+                    </div>
+                  </div>
+               </div>
+
+               {/* Bonus Block */}
+               <div className="p-4 bg-green-50/50 rounded-lg border border-green-100 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Banknote className="w-3.5 h-3.5 text-green-600" />
+                    <span className="text-[10px] font-bold text-green-700 uppercase">Bonuses</span>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase">One-time Amount ({currentCompany.symbol})</p>
+                    <input 
+                      type="number" 
+                      onFocus={(e) => e.target.select()}
+                      className="w-full px-2 py-1.5 rounded border border-white bg-white text-xs outline-none focus:border-green-500" 
+                      value={bonus} 
+                      onChange={e => handleNumericInput(e, setBonus)} 
+                    />
+                  </div>
+               </div>
+
+               {/* Leave Block */}
+               <div className="p-4 bg-orange-50/50 rounded-lg border border-orange-100 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CalendarX className="w-3.5 h-3.5 text-orange-600" />
+                    <span className="text-[10px] font-bold text-orange-700 uppercase">Unpaid Leaves</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Days</p>
+                      <input 
+                        type="number" 
+                        onFocus={(e) => e.target.select()}
+                        className="w-full px-2 py-1 rounded border border-white bg-white text-xs outline-none focus:border-orange-500" 
+                        value={leaves} 
+                        onChange={e => handleNumericInput(e, setLeaves)} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Ded/Day</p>
+                      <input 
+                        type="number" 
+                        onFocus={(e) => e.target.select()}
+                        className="w-full px-2 py-1 rounded border border-white bg-white text-xs outline-none focus:border-orange-500" 
+                        value={leaveRate} 
+                        onChange={e => handleNumericInput(e, setLeaveRate)} 
+                      />
+                    </div>
+                  </div>
+               </div>
+
+               {/* Tax Block */}
+               <div className="p-4 bg-purple-50/50 rounded-lg border border-purple-100 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Percent className="w-3.5 h-3.5 text-purple-600" />
+                    <span className="text-[10px] font-bold text-purple-700 uppercase">Compliance</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Tax (%)</p>
+                      <input 
+                        type="number" 
+                        onFocus={(e) => e.target.select()}
+                        className="w-full px-2 py-1 rounded border border-white bg-white text-xs outline-none focus:border-purple-500" 
+                        value={taxPercent} 
+                        onChange={e => handleNumericInput(e, setTaxPercent)} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">VAT (%)</p>
+                      <input 
+                        type="number" 
+                        onFocus={(e) => e.target.select()}
+                        className="w-full px-2 py-1 rounded border border-white bg-white text-xs outline-none focus:border-purple-500" 
+                        value={vatPercent} 
+                        onChange={e => handleNumericInput(e, setVatPercent)} 
+                      />
+                    </div>
+                  </div>
+               </div>
             </div>
           )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Overtime (Hours)</label>
-              <input type="number" className="w-full px-3 py-2 rounded border border-[#d9d9d9] outline-none focus:border-[#1677ff] text-sm" value={overtime} onChange={e => setOvertime(Number(e.target.value))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Bonus ({currentCompany.symbol})</label>
-              <input type="number" className="w-full px-3 py-2 rounded border border-[#d9d9d9] outline-none focus:border-[#1677ff] text-sm" value={bonus} onChange={e => setBonus(Number(e.target.value))} />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unpaid Leave (Days)</label>
-            <input type="number" className="w-full px-3 py-2 rounded border border-[#d9d9d9] outline-none focus:border-[#1677ff] text-sm" value={leaves} onChange={e => setLeaves(Number(e.target.value))} />
-          </div>
 
           <button 
             disabled={!selectedEmpId || loading}
             onClick={handleCalculate}
-            className={`w-full py-3 rounded font-bold text-sm flex items-center justify-center gap-2 text-white transition-all
-              ${!selectedEmpId || loading ? 'bg-slate-200 cursor-not-allowed' : 'bg-[#1677ff] hover:bg-[#4096ff] shadow-lg shadow-blue-500/20 active:scale-[0.98]'}
+            className={`w-full py-3.5 rounded-md font-bold text-sm flex items-center justify-center gap-2 text-white transition-all
+              ${!selectedEmpId || loading ? 'bg-slate-200 cursor-not-allowed text-slate-400' : 'bg-[#1677ff] hover:bg-[#4096ff] shadow-lg shadow-blue-500/20 active:scale-[0.98]'}
             `}
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {loading ? 'AI IS AUDITING...' : 'RUN AI CALCULATION'}
+            {loading ? 'AI IS AUDITING INPUTS...' : 'VALIDATE & PREVIEW PAYSLIP'}
           </button>
         </div>
       </div>
 
       <div className="h-full">
-        {result ? (
-          <div className="bg-white rounded-lg border border-[#f0f0f0] shadow-sm flex flex-col h-full animate-in zoom-in-95 duration-300">
+        {calculatedData ? (
+          <div className="bg-white rounded-lg border border-[#f0f0f0] shadow-sm flex flex-col h-full animate-in zoom-in-95 duration-300 overflow-hidden">
             <div className="p-4 bg-[#fafafa] border-b border-[#f0f0f0] flex justify-between items-center">
-              <h3 className="text-xs font-bold uppercase text-slate-500 tracking-widest">Audit Preview</h3>
+              <h3 className="text-xs font-bold uppercase text-slate-500 tracking-widest">Real-time Summary</h3>
               <button onClick={() => setView('payslip')} className="text-[10px] font-bold text-[#1677ff] flex items-center gap-1 hover:underline">
-                <FileText className="w-3 h-3" /> FULL VIEW
+                <FileText className="w-3.5 h-3.5" /> FULL PAYSLIP
               </button>
             </div>
             
             <div className="p-6 flex-1 flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
-                {result.warning && (
+              <div className="space-y-5">
+                {aiAudit?.warning && (
                   <div className="p-3 bg-red-50 border border-red-100 rounded flex items-start gap-2 text-red-600 animate-in shake duration-500">
                     <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <p className="text-[10px] font-bold">{result.warning}</p>
+                    <p className="text-[10px] font-bold">{aiAudit.warning}</p>
                   </div>
                 )}
                 
-                <div className="p-5 bg-slate-900 rounded-xl text-white shadow-xl">
-                    <p className="text-[9px] font-bold text-white/40 uppercase mb-1 tracking-widest">Calculated Net Payable</p>
-                    <p className="text-3xl font-bold">{currentCompany.symbol}{result.netSalary.toLocaleString()}</p>
+                <div className="p-6 bg-[#001529] rounded-xl text-white shadow-xl relative overflow-hidden">
+                    <div className="relative z-10">
+                        <p className="text-[10px] font-bold text-white/40 uppercase mb-1 tracking-widest">Net Payable (Calculated)</p>
+                        <p className="text-4xl font-bold">{currentCompany.symbol}{calculatedData.netSalary.toLocaleString()}</p>
+                    </div>
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Calculator className="w-16 h-16" />
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                        <p className="text-slate-400 font-bold uppercase mb-1 text-[9px]">Tax Liability</p>
-                        <p className="font-bold text-red-500">-{currentCompany.symbol}{result.tax.toLocaleString()}</p>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                        <p className="text-slate-400 font-bold uppercase mb-1 text-[9px]">Gross Income</p>
+                        <p className="font-bold text-slate-800 text-sm">{currentCompany.symbol}{calculatedData.grossSalary.toLocaleString()}</p>
                     </div>
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                        <p className="text-slate-400 font-bold uppercase mb-1 text-[9px]">Regulatory</p>
-                        <p className="font-bold text-red-500">-{currentCompany.symbol}{result.complianceDeductions.toLocaleString()}</p>
+                    <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                        <p className="text-slate-400 font-bold uppercase mb-1 text-[9px]">Total Deductions</p>
+                        <p className="font-bold text-red-500 text-sm">-{currentCompany.symbol}{(calculatedData.grossSalary - calculatedData.netSalary).toLocaleString()}</p>
                     </div>
                 </div>
 
                 <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg flex gap-3 items-start">
                   <TrendingDown className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                   <p className="text-[11px] font-medium text-blue-800 leading-relaxed italic">
-                    {result.breakdown.taxExplanation}
+                    {aiAudit?.taxExplanation || "AI Audit ready. Ensure percentages follow regional laws."}
                   </p>
                 </div>
               </div>
@@ -353,24 +520,38 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({
               <div className="space-y-3">
                 <button 
                   onClick={() => setShowConfirmDisburse(true)}
-                  className="w-full py-3 bg-[#52c41a] text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#73d13d] transition-all shadow-lg shadow-green-500/10 active:scale-[0.98]"
+                  className="w-full py-4 bg-[#52c41a] text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#73d13d] transition-all shadow-lg shadow-green-500/10 active:scale-[0.98]"
                 >
-                    <CheckCircle2 className="w-4 h-4" /> DISBURSE FUNDS
+                    <CheckCircle2 className="w-5 h-5" /> CONFIRM & DISBURSE
                 </button>
-                <p className="text-[9px] text-center text-slate-400 font-bold uppercase tracking-widest">Secure Bank Transfer via ZenGateway</p>
+                <div className="flex items-center justify-center gap-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  <span>AES-256 Encrypted</span>
+                  <span>•</span>
+                  <span>ZenGateway Verified</span>
+                </div>
               </div>
             </div>
           </div>
         ) : (
           <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg h-full flex flex-col items-center justify-center p-10 text-center text-slate-300">
-            <div className="bg-white p-6 rounded-full shadow-sm mb-4">
-              <Sparkles className="w-10 h-10 text-[#1677ff] opacity-40 animate-pulse" />
+            <div className="bg-white p-8 rounded-full shadow-sm mb-6">
+              <Sparkles className="w-12 h-12 text-[#1677ff] opacity-40 animate-pulse" />
             </div>
-            <h4 className="text-sm font-bold text-slate-400 uppercase mb-1">Awaiting Auditor Input</h4>
-            <p className="text-[10px] font-medium max-w-[200px]">Select an employee and enter adjustments to trigger AI-powered calculation.</p>
+            <h4 className="text-base font-bold text-slate-400 uppercase mb-2">Awaiting Configuration</h4>
+            <p className="text-[11px] font-medium max-w-[240px] leading-relaxed">Select an employee and enter adjustments like Overtime, Leaves, and Taxes to see a detailed audit preview.</p>
           </div>
         )}
       </div>
+
+      <ConfirmationModal 
+          isOpen={showConfirmDisburse}
+          title="Authorize Payout?"
+          message={`Confirming final payment of ${currentCompany.symbol}${calculatedData?.netSalary.toLocaleString()} for ${selectedEmployee?.name}. This will be added to the financial ledger.`}
+          onConfirm={executeDisbursement}
+          onCancel={() => setShowConfirmDisburse(false)}
+          confirmText="AUTHORIZE"
+          type="info"
+      />
     </div>
   );
 };

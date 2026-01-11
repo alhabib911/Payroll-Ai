@@ -19,6 +19,7 @@ import EmployeeDetailModal from './EmployeeDetailModal';
 interface EmployeeListProps {
   employees: Employee[];
   onAddEmployee: (employee: Employee) => Promise<void>;
+  onUpdateEmployee?: (employee: Employee) => void;
   companyId: string;
   userRole: UserRole;
   departments: string[];
@@ -29,6 +30,7 @@ interface EmployeeListProps {
 const EmployeeList: React.FC<EmployeeListProps> = ({ 
   employees, 
   onAddEmployee, 
+  onUpdateEmployee,
   companyId, 
   userRole,
   departments,
@@ -75,6 +77,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({
       country: formData.country,
       joinDate: new Date().toISOString().split('T')[0],
       companyId: companyId,
+      systemRole: 'Employee', // Set default system role
       salaryStructure: {
         basic: formData.basic,
         hra: formData.hra,
@@ -212,6 +215,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({
         <EmployeeDetailModal 
           employee={selectedEmployee} 
           onClose={() => setSelectedEmployee(null)} 
+          onUpdate={(updated) => {
+            if (onUpdateEmployee) onUpdateEmployee(updated);
+            setSelectedEmployee(null); // Optional: close or keep open with new data
+          }}
         />
       )}
 
@@ -305,14 +312,28 @@ const EmployeeList: React.FC<EmployeeListProps> = ({
                     <label className="text-[11px] font-bold text-slate-500 uppercase">Basic Base</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">{selectedCountrySymbol}</span>
-                      <input required type="number" className="w-full pl-8 pr-3 py-2 rounded border border-[#d9d9d9] text-sm focus:border-[#52c41a] outline-none" value={formData.basic} onChange={e => setFormData({...formData, basic: Number(e.target.value)})} />
+                      <input 
+                        required 
+                        type="number" 
+                        onFocus={(e) => e.target.select()}
+                        className="w-full pl-8 pr-3 py-2 rounded border border-[#d9d9d9] text-sm focus:border-[#52c41a] outline-none" 
+                        value={formData.basic} 
+                        onChange={e => setFormData({...formData, basic: e.target.value === '' ? 0 : Number(e.target.value)})} 
+                      />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-slate-500 uppercase">HRA / Rent</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">{selectedCountrySymbol}</span>
-                      <input required type="number" className="w-full pl-8 pr-3 py-2 rounded border border-[#d9d9d9] text-sm focus:border-[#52c41a] outline-none" value={formData.hra} onChange={e => setFormData({...formData, hra: Number(e.target.value)})} />
+                      <input 
+                        required 
+                        type="number" 
+                        onFocus={(e) => e.target.select()}
+                        className="w-full pl-8 pr-3 py-2 rounded border border-[#d9d9d9] text-sm focus:border-[#52c41a] outline-none" 
+                        value={formData.hra} 
+                        onChange={e => setFormData({...formData, hra: e.target.value === '' ? 0 : Number(e.target.value)})} 
+                      />
                     </div>
                   </div>
                 </div>

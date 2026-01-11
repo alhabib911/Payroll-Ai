@@ -92,10 +92,8 @@ const App: React.FC = () => {
             setLeaveHistory(leaves);
         }
 
-        if (profile.role === 'Admin' || profile.role === 'HR') {
-            const allLeaves = await api.getAllLeaveRequests();
-            setAllLeaveRequests(allLeaves);
-        }
+        const allLeaves = await api.getAllLeaveRequests();
+        setAllLeaveRequests(allLeaves);
       } catch (err) {
         console.error("Company data fetch error:", err);
       } finally {
@@ -181,7 +179,6 @@ const App: React.FC = () => {
     try {
         const saved = await api.updateLeaveRequest(updated);
         setAllLeaveRequests(prev => prev.map(l => l.id === id ? saved : l));
-        // Update history if employee sees their own history
         setLeaveHistory(prev => prev.map(l => l.id === id ? saved : l));
     } catch (err) {
         alert("Failed to update leave status.");
@@ -219,7 +216,6 @@ const App: React.FC = () => {
   const handleRevokeAccess = async (empId: string) => {
     await new Promise(resolve => setTimeout(resolve, 800));
     setEmployees(prev => prev.filter(e => e.id !== empId));
-    // Implementation would also delete from API/Storage
     const allStored = localStorage.getItem('zp_employees');
     if (allStored) {
         const parsed = JSON.parse(allStored);
@@ -296,6 +292,7 @@ const App: React.FC = () => {
             <PayrollCalculator 
               employees={employees} 
               currentCompany={currentCompany!}
+              allLeaveRequests={allLeaveRequests}
               onRecordCreated={handleRecordCreated} 
               initialRecord={selectedRecordForPayslip}
               onClearInitialRecord={() => setSelectedRecordForPayslip(null)}

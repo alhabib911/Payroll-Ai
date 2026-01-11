@@ -88,9 +88,9 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({ requests, employees, 
                       </div>
                       {req.paymentStatus && <p className="mt-1 text-[9px] font-black uppercase text-slate-400">[{req.paymentStatus}]</p>}
                     </td>
-                    <td className="px-8 py-5">
+                    <td className="px-8 py-5 text-right">
                       {req.status === 'Pending' ? (
-                        <div className="flex gap-2">
+                        <div className="flex justify-end gap-2">
                            <button onClick={() => setShowApprovalDialog(req.id)} className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100"><Check className="w-4 h-4" /></button>
                            <button onClick={() => handleAction(req.id, 'Rejected')} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100"><X className="w-4 h-4" /></button>
                         </div>
